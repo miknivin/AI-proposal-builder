@@ -1,26 +1,153 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4efe6;
+  --foreground: #1b1b18;
+  --surface: #fffdf8;
+  --surface-strong: #f6f0e7;
+  --line: rgba(27, 27, 24, 0.12);
+  --accent: #a33f22;
+  --accent-dark: #7f2c15;
+  --muted: #6a645d;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-dark: var(--accent-dark);
+  --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(163, 63, 34, 0.18),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(50, 32, 24, 0.1),
+      transparent 20%
+    ),
+    linear-gradient(180deg, #f8f4ec 0%, #f1ebdf 100%);
+}
+
+.panel {
+  background: color-mix(in srgb, var(--surface) 90%, white 10%);
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 60px rgba(56, 42, 28, 0.08);
+}
+
+.field,
+.textarea,
+.select {
+  width: 100%;
+  border: 1px solid rgba(27, 27, 24, 0.14);
+  background: rgba(255, 253, 248, 0.9);
+  border-radius: 18px;
+  padding: 0.85rem 1rem;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.field:focus,
+.textarea:focus,
+.select:focus {
+  border-color: rgba(163, 63, 34, 0.6);
+  box-shadow: 0 0 0 4px rgba(163, 63, 34, 0.12);
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.button-primary,
+.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.85rem 1.3rem;
+  font-weight: 600;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.button-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.button-primary:hover {
+  background: var(--accent-dark);
+}
+
+.button-secondary {
+  border: 1px solid rgba(27, 27, 24, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.button-secondary:hover {
+  border-color: rgba(163, 63, 34, 0.4);
+}
+
+.button-primary:hover,
+.button-secondary:hover {
+  transform: translateY(-1px);
+}
+
+.eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.grid-auto {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .grid-auto.cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
