@@ -89,7 +89,7 @@ export function AuthPanel() {
                       password: event.target.value,
                     }))
                   }
-                  placeholder="Minimum 6 characters"
+                  placeholder="Password"
                 />
               </label>
             </div>
