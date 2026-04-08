@@ -1,24 +1,23 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-import type { ProposalDraftResult, ProposalSpecificDraft, QuestionnaireAnswer } from "@/app/types/proposal";
-
-type ProposalListItem = {
-  id: string;
-  title: string;
-  preparedFor: string;
-  summary: string;
-  pdfUrl: string;
-  version: number;
-};
+import type {
+  ProposalDraftResult,
+  ProposalHistoryItem,
+  ProposalSpecificDraft,
+  ProposalThreadDetail,
+  QuestionnaireAnswer,
+} from "@/app/types/proposal";
 
 type DraftRequest = {
   prompt: string;
   preparedFor?: string;
   questionnaireAnswers?: QuestionnaireAnswer[];
   conversationId?: string;
+  proposalId?: string;
 };
 
 type FinalizeRequest = {
+  proposalId?: string;
   conversationId: string;
   proposalSpecific: ProposalSpecificDraft;
   summary?: string;
@@ -27,15 +26,15 @@ type FinalizeRequest = {
 export const proposalApi = createApi({
   reducerPath: "proposalApi",
   baseQuery: fetchBaseQuery({ baseUrl: "", credentials: "include" }),
-  tagTypes: ["Proposals"],
+  tagTypes: ["Proposals", "ProposalThread"],
   endpoints: (builder) => ({
-    listProposals: builder.query<ProposalListItem[], void>({
+    listProposals: builder.query<ProposalHistoryItem[], void>({
       query: () => ({ url: "/api/proposals", method: "GET" }),
-      transformResponse: (response: { proposals: ProposalListItem[] }) => response.proposals ?? [],
+      transformResponse: (response: { proposals: ProposalHistoryItem[] }) => response.proposals ?? [],
       providesTags: ["Proposals"],
     }),
     draftProposal: builder.mutation<
-      ProposalDraftResult & { conversationId: string },
+      ProposalDraftResult & { conversationId: string; proposalId?: string | null },
       DraftRequest
     >({
       query: (body) => ({
@@ -47,7 +46,7 @@ export const proposalApi = createApi({
     finalizeProposal: builder.mutation<
       {
         success: boolean;
-        proposal: ProposalListItem;
+        proposal: ProposalHistoryItem;
       },
       FinalizeRequest
     >({
@@ -56,10 +55,12 @@ export const proposalApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Proposals"],
+      invalidatesTags: ["Proposals", "ProposalThread"],
     }),
-    getProposal: builder.query<any, string>({
+    getProposal: builder.query<ProposalThreadDetail, string>({
       query: (id) => ({ url: `/api/proposals/${id}`, method: "GET" }),
+      transformResponse: (response: { proposal: ProposalThreadDetail }) => response.proposal,
+      providesTags: (_result, _error, id) => [{ type: "ProposalThread", id }],
     }),
   }),
 });
@@ -69,4 +70,5 @@ export const {
   useDraftProposalMutation,
   useFinalizeProposalMutation,
   useGetProposalQuery,
+  useLazyGetProposalQuery,
 } = proposalApi;

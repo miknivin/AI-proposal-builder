@@ -3,12 +3,16 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
-import { HistoryPanel } from "@/app/components/proposal/HistoryPanel";
+import { HistoryModalBody } from "@/app/components/proposal/HistoryModalBody";
+import { PdfPreviewModalBody } from "@/app/components/proposal/PdfPreviewModalBody";
 import { PromptSection } from "@/app/components/proposal/PromptSection";
 import { QuestionnaireSection } from "@/app/components/proposal/QuestionnaireSection";
+import { ThreadViewer } from "@/app/components/proposal/ThreadViewer";
+import { WorkspaceHeader } from "@/app/components/proposal/WorkspaceHeader";
+import { Modal } from "@/app/components/ui/Modal";
 import {
   defaultServiceColumns,
   type ServiceColumn,
@@ -16,103 +20,30 @@ import {
 import {
   useDraftProposalMutation,
   useFinalizeProposalMutation,
+  useGetProposalQuery,
   useListProposalsQuery,
 } from "@/app/lib/state/proposalApi";
 import { useLogoutMutation } from "@/app/lib/state/authApi";
 import { useAppSelector } from "@/app/lib/state/store";
 import type {
+  ProposalHistoryItem,
   ProposalSpecificDraft,
   QuestionnaireAnswer,
   QuestionnaireItem,
 } from "@/app/types/proposal";
-import { Spinner } from "@/app/components/Spinner";
-import Link from "next/link";
-
-const IconEdit = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-  </svg>
-);
-const IconLogout = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
-const IconHistory = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <polyline points="3 3 3 12 12 12" />
-    <path d="M21 12a9 9 0 1 1-9-9" />
-  </svg>
-);
-const IconX = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-const IconUser = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
 
 type Props = {
   userName: string;
   companyName: string;
   profileComplete: boolean;
-  initialProposals: Array<{
-    id: string;
-    title: string;
-    preparedFor: string;
-    summary: string;
-    pdfUrl: string;
-    version: number;
-  }>;
+  initialProposals: ProposalHistoryItem[];
+  initialProposalId?: string | null;
 };
 
 type DraftState = {
+  proposalId?: string | null;
   conversationId?: string;
+  chatTitle?: string;
   summary?: string;
   questionnaire?: QuestionnaireItem[];
   proposalSpecific?: ProposalSpecificDraft;
@@ -155,6 +86,7 @@ export function ProposalWorkspace({
   companyName,
   profileComplete,
   initialProposals,
+  initialProposalId = null,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -175,16 +107,26 @@ export function ProposalWorkspace({
     Record<string, ServiceColumn[]>
   >({});
   const [showHistory, setShowHistory] = useState(false);
+  const [activeProposalId, setActiveProposalId] = useState<string | null>(
+    initialProposalId,
+  );
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [draftProposal, { isLoading: drafting }] = useDraftProposalMutation();
   const [finalizeProposal, { isLoading: finalizing }] =
     useFinalizeProposalMutation();
   const [logoutApi] = useLogoutMutation();
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const {
     data: proposalsData,
     refetch: refetchProposals,
     isFetching: loadingHistory,
   } = useListProposalsQuery();
+  const {
+    data: activeThread,
+    refetch: refetchActiveThread,
+    isFetching: loadingThread,
+  } = useGetProposalQuery(activeProposalId ?? "", {
+    skip: !activeProposalId,
+  });
 
   useEffect(() => {
     if (!draftState.questionnaire) return;
@@ -192,6 +134,47 @@ export function ProposalWorkspace({
     setServiceColumns(derived);
     setAnswers(buildEmptyAnswers(draftState.questionnaire, derived));
   }, [draftState.questionnaire]);
+
+  useEffect(() => {
+    setActiveProposalId(initialProposalId);
+    setSelectedVersion(null);
+    setDraftState({});
+    setAnswers([]);
+    setPrompt("");
+    setError("");
+    setSuccess("");
+    if (!initialProposalId) {
+      setPdfUrl(null);
+    }
+  }, [initialProposalId]);
+
+  useEffect(() => {
+    if (!activeThread) return;
+    setDraftState((current) => ({
+      ...current,
+      proposalId: activeThread.id,
+      conversationId: activeThread.conversationId,
+      chatTitle: activeThread.chatTitle,
+    }));
+    setSelectedVersion(activeThread.latestVersion);
+    if (activeThread.preparedFor && activeThread.preparedFor !== preparedFor) {
+      setPreparedFor(activeThread.preparedFor);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("preparedFor", activeThread.preparedFor);
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    }
+  }, [activeThread, pathname, preparedFor, router, searchParams]);
+
+  useEffect(() => {
+    if (!activeThread || selectedVersion === null) return;
+    const version =
+      activeThread.versions.find((item) => item.version === selectedVersion) ??
+      activeThread.versions[activeThread.versions.length - 1];
+    setPdfUrl(version?.pdfUrl ?? activeThread.latestPdfUrl ?? null);
+  }, [activeThread, selectedVersion]);
 
   const updateAnswer = (
     questionId: string,
@@ -254,6 +237,76 @@ export function ProposalWorkspace({
     });
   };
 
+  const updatePreparedFor = (value: string) => {
+    setPreparedFor(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set("preparedFor", value);
+    } else {
+      params.delete("preparedFor");
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  };
+
+  const openProposalChat = (proposalId: string) => {
+    setShowHistory(false);
+    setError("");
+    setSuccess("");
+    setPrompt("");
+    setAnswers([]);
+    setDraftState({});
+    router.push(`/${proposalId}`);
+  };
+
+  const finalizeDraft = async ({
+    conversationId,
+    proposalSpecific,
+    summary,
+    proposalId,
+    chatTitle,
+  }: {
+    conversationId: string;
+    proposalSpecific: ProposalSpecificDraft;
+    summary?: string;
+    proposalId?: string | null;
+    chatTitle?: string;
+  }) => {
+    const response = await finalizeProposal({
+      proposalId: activeProposalId ?? proposalId ?? undefined,
+      conversationId,
+      proposalSpecific,
+      summary,
+    }).unwrap();
+
+    if (!response.success || !response.proposal?.latestPdfUrl) {
+      throw new Error("Unable to finalize proposal.");
+    }
+
+    setSuccess("Proposal finalized and PDF ready.");
+    setActiveProposalId(response.proposal.id);
+    setSelectedVersion(response.proposal.latestVersion);
+    setPdfUrl(response.proposal.latestPdfUrl);
+    setShowPdfModal(true);
+    setPrompt("");
+    setDraftState((current) => ({
+      ...current,
+      proposalId: response.proposal.id,
+      chatTitle: response.proposal.chatTitle || chatTitle,
+      summary,
+      questionnaire: undefined,
+      proposalSpecific: undefined,
+    }));
+    await refetchProposals();
+    await refetchActiveThread();
+
+    if (!activeProposalId && pathname === "/new") {
+      router.replace(`/${response.proposal.id}`);
+    }
+  };
+
   const submitDraft = async (questionnaireAnswers?: QuestionnaireAnswer[]) => {
     setError("");
     setSuccess("");
@@ -272,7 +325,16 @@ export function ProposalWorkspace({
         if (q.type === "textarea") return !ans.value?.trim();
         if (q.type === "radio") return !ans.selectedOptionIds?.length;
         if (q.type === "checkbox") return !ans.selectedOptionIds?.length;
-        if (q.type === "services") return !ans.servicesItems?.length;
+        if (q.type === "services") {
+          if (!ans.servicesItems?.length) return true;
+          return ans.servicesItems.some((row) => {
+            const title = String(
+              row.title ?? row.name ?? row.service ?? "",
+            ).trim();
+            const unitPrice = String(row.unitPrice ?? "").trim();
+            return !title || !unitPrice;
+          });
+        }
         if (q.type === "number") return !ans.value?.toString().trim();
         return false;
       });
@@ -288,11 +350,14 @@ export function ProposalWorkspace({
         preparedFor,
         questionnaireAnswers,
         conversationId: draftState.conversationId,
+        proposalId: activeProposalId ?? draftState.proposalId ?? undefined,
       }).unwrap();
 
       if (result.status === "needs_more_info") {
         setDraftState({
+          proposalId: result.proposalId ?? activeProposalId ?? undefined,
           conversationId: result.conversationId,
+          chatTitle: result.chatTitle ?? draftState.chatTitle,
           summary: result.summary,
           questionnaire: result.questionnaire,
         });
@@ -301,27 +366,25 @@ export function ProposalWorkspace({
       }
 
       setDraftState({
+        proposalId:
+          result.proposalId ?? activeProposalId ?? draftState.proposalId,
         conversationId: result.conversationId,
+        chatTitle: result.chatTitle ?? result.proposalSpecific.chatTitle,
         summary: result.summary,
         proposalSpecific: result.proposalSpecific,
       });
-
-      const response = await finalizeProposal({
+      await finalizeDraft({
+        proposalId:
+          result.proposalId ?? activeProposalId ?? draftState.proposalId,
         conversationId: result.conversationId,
         proposalSpecific: result.proposalSpecific,
         summary: result.summary,
-      }).unwrap();
-
-      if (response.success && response.proposal?.pdfUrl) {
-        setSuccess("Proposal finalized and PDF ready.");
-        setPdfUrl(response.proposal.pdfUrl);
-        setShowPdfModal(true);
-        await refetchProposals();
-      } else {
-        setError("Unable to finalize proposal.");
-      }
+        chatTitle: result.chatTitle ?? result.proposalSpecific.chatTitle,
+      });
     } catch (err: any) {
-      setError(err?.data?.message ?? "Unable to draft proposal.");
+      setError(
+        err?.data?.message ?? err?.message ?? "Unable to draft proposal.",
+      );
     }
   };
 
@@ -337,92 +400,42 @@ export function ProposalWorkspace({
     });
   };
 
-  const headerInitial = useMemo(
-    () => (companyName ? companyName.charAt(0).toUpperCase() : "C"),
-    [companyName],
-  );
-
-  const updatePreparedFor = (value: string) => {
-    setPreparedFor(value);
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) {
-      params.set("preparedFor", value);
-    } else {
-      params.delete("preparedFor");
-    }
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, {
-      scroll: false,
-    });
-  };
-
   return (
     <div className="app-shell min-h-screen px-4 py-6 md:px-6">
       <div className="mx-auto max-w-7xl space-y-4">
-        <header className="flex items-center justify-between rounded-2xl border border-line bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent font-semibold">
-              {headerInitial}
-            </div>
-            <div>
-              <p className="text-sm text-muted">Signed in as {userName}</p>
-
-              <p className="text-base font-semibold">
-                {companyName || "Company"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 relative">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-2 text-sm hover:bg-surface-strong"
-              onClick={() => setShowHistory((v) => !v)}
-            >
-              <IconHistory />
-              {showHistory ? "Hide history" : "Show history"}
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-2 text-sm hover:bg-surface-strong"
-              onClick={() => setUserMenuOpen((v) => !v)}
-            >
-              <IconUser />
-              {userName}
-            </button>
-            {userMenuOpen ? (
-              <div className="absolute right-0 top-12 w-48 rounded-2xl border border-line bg-white shadow-lg">
-                <Link
-                  href="/company"
-                  className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-strong"
-                  onClick={() => setUserMenuOpen(false)}
-                >
-                  <IconEdit />
-                  Edit profile
-                </Link>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-left hover:bg-surface-strong"
-                  onClick={() => {
-                    setUserMenuOpen(false);
-                    logout();
-                  }}
-                >
-                  <IconLogout />
-                  Sign out
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </header>
+        <WorkspaceHeader
+          userName={userName}
+          companyName={companyName}
+          showHistory={showHistory}
+          onNewChat={() => {
+            setShowHistory(false);
+            router.push("/new");
+          }}
+          onToggleHistory={() => setShowHistory((value) => !value)}
+          onLogout={logout}
+        />
 
         <div className="grid gap-4 grid-cols-1">
           <main className="space-y-4 relative pb-40">
+            {activeThread ? (
+              <ThreadViewer
+                thread={activeThread}
+                selectedVersion={selectedVersion ?? activeThread.latestVersion}
+                onSelectVersion={setSelectedVersion}
+                onOpenPdf={() => setShowPdfModal(true)}
+              />
+            ) : loadingThread ? (
+              <div className="panel rounded-[28px] p-5 md:p-8 text-sm text-muted">
+                Loading proposal chat...
+              </div>
+            ) : null}
+
             {draftState.questionnaire?.length ? (
               <QuestionnaireSection
                 questionnaire={draftState.questionnaire}
                 answers={answers}
                 serviceColumns={serviceColumns}
-                isPending={isPending}
+                isPending={isPending || drafting}
                 onAnswer={updateAnswer}
                 onAddColumn={addServiceColumn}
                 onAddRow={addServiceRow}
@@ -433,7 +446,7 @@ export function ProposalWorkspace({
               />
             ) : null}
 
-            {pdfUrl ? (
+            {!activeThread && pdfUrl ? (
               <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
                 <p className="mb-2 text-sm font-medium">Generated PDF</p>
                 <div className="flex flex-wrap items-center gap-3">
@@ -476,97 +489,51 @@ export function ProposalWorkspace({
               prompt={prompt}
               isPending={isPending || drafting || finalizing}
               disabled={!profileComplete || !authState.companyProfileComplete}
+              forcePromptVisible={Boolean(activeProposalId)}
               onPreparedFor={updatePreparedFor}
               onPrompt={setPrompt}
               onSubmit={() => startTransition(() => void submitDraft())}
             />
           </div>
         </div>
-        {showHistory ? (
-          <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/40 px-4 py-10">
-            <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-line px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <IconHistory />
-                  <span className="text-sm font-semibold">
-                    Proposal history
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 text-sm hover:bg-surface-strong"
-                  onClick={() => setShowHistory(false)}
-                >
-                  Close
-                  <IconX />
-                </button>
-              </div>
-              <div className="max-h-[70vh] overflow-y-auto p-4">
-                <HistoryPanel
-                  proposals={proposalsData ?? initialProposals}
-                  loading={loadingHistory}
-                  onRefresh={() => void refetchProposals()}
-                />
-              </div>
-            </div>
-          </div>
-        ) : null}
+        <Modal
+          isOpen={showHistory}
+          onClose={() => setShowHistory(false)}
+          title="Proposal history"
+          size="2xl"
+          placement="top"
+        >
+          <HistoryModalBody
+            proposals={proposalsData ?? initialProposals}
+            loading={loadingHistory}
+            onRefresh={() => void refetchProposals()}
+            onOpenChat={openProposalChat}
+          />
+        </Modal>
 
-        {showPdfModal && pdfUrl ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 md:p-8">
-            <div className="relative flex h-[85vh] w-full max-w-6xl flex-col rounded-[28px] border border-line bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-line px-5 py-4">
-                <div>
-                  <p className="text-base font-semibold">Generated PDF</p>
-                  <p className="text-sm text-muted">
-                    Review the exported proposal before sharing it.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <a
-                    className="button-secondary"
-                    href={pdfUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open in new tab
-                  </a>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-2 text-sm hover:bg-surface-strong"
-                    onClick={() => setShowPdfModal(false)}
-                  >
-                    Close
-                    <IconX />
-                  </button>
-                </div>
-              </div>
-              <div className="min-h-0 flex-1 p-4">
-                <object
-                  data={pdfUrl}
-                  type="application/pdf"
-                  className="h-full w-full rounded-2xl border border-line"
-                >
-                  <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-line bg-surface-strong p-6 text-center">
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted">
-                        PDF preview is not available in this browser.
-                      </p>
-                      <a
-                        className="text-accent underline"
-                        href={pdfUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open PDF
-                      </a>
-                    </div>
-                  </div>
-                </object>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        <Modal
+          isOpen={showPdfModal && Boolean(pdfUrl)}
+          onClose={() => setShowPdfModal(false)}
+          title="Generated PDF"
+          description="Review the exported proposal before sharing it."
+          size="6xl"
+          contentClassName="flex h-[85vh] flex-col"
+          bodyClassName="min-h-[65vh] flex-1"
+          actions={
+            pdfUrl ? (
+              <a
+                className="button-secondary"
+                href={pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open in new tab
+              </a>
+            ) : null
+          }
+        >
+          {pdfUrl ? <PdfPreviewModalBody pdfUrl={pdfUrl} /> : null}
+        </Modal>
       </div>
     </div>
   );

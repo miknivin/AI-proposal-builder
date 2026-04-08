@@ -1,7 +1,12 @@
 import { useState } from "react";
 
-import type { QuestionnaireAnswer, QuestionnaireItem } from "@/app/types/proposal";
+import type {
+  QuestionnaireAnswer,
+  QuestionnaireItem,
+} from "@/app/types/proposal";
 import type { ServiceColumn } from "@/app/components/proposal/types";
+import { AddColumnModalBody } from "@/app/components/proposal/AddColumnModalBody";
+import { Modal } from "@/app/components/ui/Modal";
 
 type Props = {
   question: QuestionnaireItem;
@@ -23,18 +28,26 @@ export function ServicesEditor({
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [newColumnLabel, setNewColumnLabel] = useState("");
 
+  const closeColumnModal = () => {
+    setShowColumnModal(false);
+    setNewColumnLabel("");
+  };
+
   const handleAddColumn = () => {
     const label = newColumnLabel.trim();
     if (!label) return;
     onAddColumn(label);
-    setNewColumnLabel("");
-    setShowColumnModal(false);
+    closeColumnModal();
   };
 
   return (
     <div className="mt-4 space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="button-secondary px-4 py-2 text-sm" onClick={onAddRow}>
+        <button
+          type="button"
+          className="button-secondary px-4 py-2 text-sm"
+          onClick={onAddRow}
+        >
           Add service row
         </button>
         <button
@@ -66,7 +79,9 @@ export function ServicesEditor({
                       className="field"
                       type={col.type === "number" ? "number" : "text"}
                       value={row[col.id] !== undefined ? String(row[col.id]) : ""}
-                      onChange={(event) => onChangeCell(rowIndex, col.id, event.target.value)}
+                      onChange={(event) =>
+                        onChangeCell(rowIndex, col.id, event.target.value)
+                      }
                       placeholder={col.label}
                     />
                   </td>
@@ -77,37 +92,19 @@ export function ServicesEditor({
         </table>
       </div>
 
-      {showColumnModal ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lg space-y-4">
-            <div className="space-y-2">
-              <p className="text-lg font-semibold">Add column</p>
-              <p className="text-sm text-muted">Enter a column header like “GST”, “Tax”, or “Notes”.</p>
-            </div>
-            <input
-              className="field"
-              value={newColumnLabel}
-              onChange={(e) => setNewColumnLabel(e.target.value)}
-              placeholder="Column header"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="button-secondary"
-                onClick={() => {
-                  setShowColumnModal(false);
-                  setNewColumnLabel("");
-                }}
-              >
-                Cancel
-              </button>
-              <button type="button" className="button-primary" onClick={handleAddColumn}>
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <Modal
+        isOpen={showColumnModal}
+        onClose={closeColumnModal}
+        title="Add column"
+        size="sm"
+      >
+        <AddColumnModalBody
+          value={newColumnLabel}
+          onChange={setNewColumnLabel}
+          onCancel={closeColumnModal}
+          onSubmit={handleAddColumn}
+        />
+      </Modal>
     </div>
   );
 }

@@ -52,7 +52,9 @@ export type ProposalService = {
 };
 
 export type PaymentTerm = {
-  label: string;
+  label?: string;
+  paymentTitle?: string;
+  paymentPercent?: number;
   amountLabel?: string;
   amount?: number;
 };
@@ -89,14 +91,17 @@ export type CompanyProfileShape = {
   apartCards: ApartCard[];
   isComplete: boolean;
 };
+
 export type ProposalSpecificInput = {
   prompt: string;
   preparedFor?: string;
   questionnaireAnswers?: QuestionnaireAnswer[];
   conversationId?: string;
+  proposalId?: string;
 };
 
 export type ProposalSpecificDraft = {
+  chatTitle?: string;
   title: string;
   preparedFor: string;
   coverTitleLine1: string;
@@ -158,19 +163,66 @@ export type ProposalRenderPayload = {
   };
 };
 
+export type ProposalThreadMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+  version?: number;
+  summary?: string;
+  questionnaire?: QuestionnaireItem[];
+  questionnaireAnswers?: QuestionnaireAnswer[];
+  pdfUrl?: string;
+  createdAt?: string;
+};
+
+export type ProposalVersion = {
+  version: number;
+  title: string;
+  summary: string;
+  pdfUrl: string;
+  s3Key: string;
+  proposalSpecific: ProposalSpecificDraft;
+  renderPayload: ProposalRenderPayload;
+  createdAt?: string;
+};
+
+export type ProposalHistoryItem = {
+  id: string;
+  chatTitle: string;
+  preparedFor: string;
+  latestVersion: number;
+  latestPdfUrl: string;
+  latestTitle: string;
+  latestSummary: string;
+  updatedAt?: string;
+};
+
+export type ProposalThreadDetail = {
+  id: string;
+  chatTitle: string;
+  preparedFor: string;
+  conversationId: string;
+  latestVersion: number;
+  latestPdfUrl: string;
+  latestTitle: string;
+  latestSummary: string;
+  latestProposalSpecific: ProposalSpecificDraft;
+  versions: ProposalVersion[];
+  messages: ProposalThreadMessage[];
+};
+
 export type ProposalDraftResult =
   | {
       status: "needs_more_info";
       conversationId?: string;
+      chatTitle?: string;
       summary: string;
       questionnaire: QuestionnaireItem[];
     }
   | {
       status: "ready";
       conversationId?: string;
+      chatTitle?: string;
       summary: string;
       proposalSpecific: ProposalSpecificDraft;
     };
-
-
 

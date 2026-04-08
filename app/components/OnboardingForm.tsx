@@ -20,7 +20,9 @@ type OnboardingProfile = {
   logoUrl?: string;
   coreServices?: string[];
   defaultPaymentTerms?: Array<{
-    label: string;
+    label?: string;
+    paymentTitle?: string;
+    paymentPercent?: number;
     amountLabel?: string;
     amount?: number;
   }>;
@@ -86,7 +88,7 @@ export function OnboardingForm({
         : [],
     defaultPaymentTerms:
       initialProfile?.defaultPaymentTerms
-        ?.map((item) => item.label)
+        ?.map((item) => item.label ?? item.paymentTitle ?? "")
         .join("\n") ?? "50% advance\n50% on completion",
     apartCards: initialProfile?.apartCards ?? [
       { title: "Creative Approach", description: "We tailor every proposal." },
@@ -206,7 +208,7 @@ export function OnboardingForm({
           "Company profile saved. Redirecting to the proposal builder...",
         );
         startTransition(() => {
-          router.push("/builder");
+          router.push("/new");
           router.refresh();
         });
       } else {
@@ -704,3 +706,4 @@ export function OnboardingForm({
     </div>
   );
 }
+

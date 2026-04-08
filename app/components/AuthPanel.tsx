@@ -40,7 +40,7 @@ export function AuthPanel() {
     }
 
     startTransition(() => {
-      router.push(data.isComplete ? "/builder" : "/onboarding");
+      router.push(data.isComplete ? "/new" : "/onboarding");
       router.refresh();
     });
   };

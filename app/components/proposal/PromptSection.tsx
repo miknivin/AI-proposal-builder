@@ -1,4 +1,6 @@
-import { useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useEffect, useRef, useState } from "react";
+import { SendIcon } from "@/app/components/icons/SendIcon";
 import { Spinner } from "@/app/components/Spinner";
 
 type Props = {
@@ -6,6 +8,7 @@ type Props = {
   prompt: string;
   isPending: boolean;
   disabled?: boolean;
+  forcePromptVisible?: boolean;
   onPreparedFor: (value: string) => void;
   onPrompt: (value: string) => void;
   onSubmit: () => void;
@@ -16,12 +19,28 @@ export function PromptSection({
   prompt,
   isPending,
   disabled,
+  forcePromptVisible,
   onPreparedFor,
   onPrompt,
   onSubmit,
 }: Props) {
-  const [showPrompt, setShowPrompt] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(Boolean(forcePromptVisible));
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const missingPrepared = !preparedFor.trim();
+
+  useEffect(() => {
+    if (forcePromptVisible) {
+      setShowPrompt(true);
+    }
+  }, [forcePromptVisible]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "0px";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [prompt, showPrompt]);
 
   return (
     <div className="w-full rounded-[18px] border border-line bg-white px-4 py-3 shadow-lg space-y-2">
@@ -39,7 +58,7 @@ export function PromptSection({
         {!showPrompt ? (
           <button
             type="button"
-          className="button-secondary whitespace-nowrap"
+            className="button-secondary whitespace-nowrap"
             disabled={disabled || missingPrepared}
             onClick={() => {
               if (!missingPrepared) setShowPrompt(true);
@@ -55,40 +74,29 @@ export function PromptSection({
           className={`flex items-center justify-center gap-2 transition-opacity textarea`}
         >
           <textarea
-            className=" flex-1 border-0 outline-0"
+            ref={textareaRef}
+            className="flex-1 resize-none border-0 outline-0"
             value={prompt}
             onChange={(event) => onPrompt(event.target.value)}
             placeholder="Describe what you need. Example: Website redesign with CMS, SEO, and launch support."
             disabled={disabled}
-            rows={1}
+            rows={4}
           />
-        <button
-          type="button"
-          className="button-primary self-end whitespace-nowrap flex items-center justify-center gap-1"
-          disabled={isPending || disabled || !showPrompt}
-          onClick={onSubmit}
-        >
-          {isPending ? (
-            <>
-              <Spinner size={18} />
-              <span className="text-sm">Generating...</span>
-            </>
-          ) : disabled ? (
-            <span className="text-sm">Complete profile first</span>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5"
-              >
-                <path d="m22 2-7 20-4-9-9-4Z" />
-                <path d="M22 2 11 13" />
-              </svg>
+          <button
+            type="button"
+            className="button-primary self-end whitespace-nowrap flex items-center justify-center gap-1"
+            disabled={isPending || disabled || !showPrompt}
+            onClick={onSubmit}
+          >
+            {isPending ? (
+              <>
+                <Spinner size={18} />
+                <span className="text-sm">Generating...</span>
+              </>
+            ) : disabled ? (
+              <span className="text-sm">Complete profile first</span>
+            ) : (
+              <SendIcon className="h-5 w-5" />
             )}
           </button>
         </div>

@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+const wordCount = (value: string) =>
+  value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
 export const registerSchema = z.object({
   name: z.string().trim().min(2),
   email: z.string().trim().email(),
@@ -11,11 +17,17 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
-export const paymentTermSchema = z.object({
-  label: z.string().trim().min(1),
-  amountLabel: z.string().trim().optional(),
-  amount: z.number().optional(),
-});
+export const paymentTermSchema = z
+  .object({
+    label: z.string().trim().optional(),
+    paymentTitle: z.string().trim().optional(),
+    paymentPercent: z.number().optional(),
+    amountLabel: z.string().trim().optional(),
+    amount: z.number().optional(),
+  })
+  .refine((value) => Boolean(value.label || value.paymentTitle), {
+    message: "Payment term must include a label or paymentTitle.",
+  });
 
 export const apartCardSchema = z.object({
   title: z.string().trim().min(1),
@@ -60,11 +72,21 @@ export const proposalDraftInputSchema = z.object({
   preparedFor: z.string().trim().optional(),
   questionnaireAnswers: z.array(questionnaireAnswerSchema).optional(),
   conversationId: z.string().trim().optional(),
+  proposalId: z.string().trim().optional(),
 });
 
 export const proposalServiceSchema = z.object({
   title: z.string().trim().min(1),
-  description: z.string().trim().optional(),
+  description: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => !value || wordCount(value) >= 20, {
+      message: "Service description must be at least 20 words.",
+    })
+    .refine((value) => !value || wordCount(value) <= 25, {
+      message: "Service description must be at most 25 words.",
+    }),
   quantity: z.number().optional(),
   unitPrice: z.number().optional(),
   price: z.number().optional(),
@@ -80,12 +102,31 @@ export const proposalPricingColumnSchema = z.object({
 });
 
 export const proposalSpecificSchema = z.object({
+  chatTitle: z.string().trim().min(3).optional(),
   title: z.string().trim().min(3),
   preparedFor: z.string().trim().min(2),
   coverTitleLine1: z.string().trim().min(2),
   coverTitleLine2: z.string().trim().min(2),
-  aboutText: z.string().trim().min(20),
-  passionText: z.string().trim().min(20),
+  aboutText: z
+    .string()
+    .trim()
+    .min(20)
+    .refine((value) => wordCount(value) >= 50, {
+      message: "About text must be at least 50 words.",
+    })
+    .refine((value) => wordCount(value) <= 60, {
+      message: "About text must be at most 60 words.",
+    }),
+  passionText: z
+    .string()
+    .trim()
+    .min(20)
+    .refine((value) => wordCount(value) >= 60, {
+      message: "Passion text must be at least 60 words.",
+    })
+    .refine((value) => wordCount(value) <= 75, {
+      message: "Passion text must be at most 75 words.",
+    }),
   expertiseHighlightText: z.string().trim().min(20),
   services: z.array(proposalServiceSchema).min(1),
   pricingColumns: z.array(proposalPricingColumnSchema).optional(),
@@ -107,6 +148,7 @@ export const proposalSpecificSchema = z.object({
 });
 
 export const finalizeProposalSchema = z.object({
+  proposalId: z.string().trim().optional(),
   proposalSpecific: proposalSpecificSchema,
   summary: z.string().trim().optional(),
 });
@@ -159,5 +201,6 @@ export const renderPayloadSchema = z.object({
     logoHorizontal: z.string().trim().url(),
   }),
 });
+
 
 

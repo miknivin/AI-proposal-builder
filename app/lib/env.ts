@@ -20,7 +20,7 @@ export const env = {
     return process.env.AI_GATEWAY_BASE_URL ?? "https://ai-gateway.vercel.sh/v1";
   },
   get aiGatewayModel() {
-    return process.env.AI_GATEWAY_MODEL ?? "gpt-4.1-mini";
+    return process.env.AI_GATEWAY_MODEL ?? "openai/gpt-4.1";
   },
   get awsRegion() {
     return required(process.env.AWS_REGION, "AWS_REGION");

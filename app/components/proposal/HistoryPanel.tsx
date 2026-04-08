@@ -1,23 +1,19 @@
+import type { ProposalHistoryItem } from "@/app/types/proposal";
+
 type Props = {
-  proposals: Array<{
-    id: string;
-    title: string;
-    preparedFor: string;
-    summary: string;
-    pdfUrl: string;
-    version: number;
-  }>;
+  proposals: ProposalHistoryItem[];
   loading: boolean;
   onRefresh: () => void;
+  onOpenChat: (proposalId: string) => void;
 };
 
-export function HistoryPanel({ proposals, loading, onRefresh }: Props) {
+export function HistoryPanel({ proposals, loading, onRefresh, onOpenChat }: Props) {
   return (
     <section className="panel rounded-[28px] p-5 md:p-8">
       <div className="flex items-center justify-between">
         <div>
           <p className="eyebrow">Proposal History</p>
-          <h2 className="mt-2 text-2xl font-semibold">Saved proposals</h2>
+          <h2 className="mt-2 text-2xl font-semibold">Saved proposal chats</h2>
         </div>
         <button
           type="button"
@@ -34,21 +30,28 @@ export function HistoryPanel({ proposals, loading, onRefresh }: Props) {
               key={proposal.id}
               className="rounded-[22px] border border-line bg-surface-strong p-4"
             >
-              <p className="font-semibold">{proposal.title}</p>
+              <p className="font-semibold">{proposal.chatTitle}</p>
               <p className="mt-1 text-sm text-muted">
                 Prepared for {proposal.preparedFor}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
                 <span className="rounded-full bg-white px-3 py-1">
-                  v{proposal.version}
+                  v{proposal.latestVersion}
                 </span>
+                <button
+                  type="button"
+                  className="text-accent underline"
+                  onClick={() => onOpenChat(proposal.id)}
+                >
+                  Open chat
+                </button>
                 <a
                   className="text-accent underline"
-                  href={proposal.pdfUrl}
+                  href={proposal.latestPdfUrl}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open PDF
+                  Open latest PDF
                 </a>
               </div>
             </div>
