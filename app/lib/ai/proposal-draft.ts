@@ -15,6 +15,11 @@ import type {
 import { env } from "@/app/lib/env";
 import { proposalSpecificSchema } from "@/app/lib/schemas";
 import { proposalSystemPrompt } from "@/app/lib/ai/prompt";
+import {
+  ABOUT_TEXT_WORDS,
+  PASSION_TEXT_WORDS,
+  SERVICE_DESCRIPTION_WORDS,
+} from "@/app/lib/proposal/textConstraints";
 
 const normalizeText = (value: string) => value.trim().replace(/\s+/g, " ");
 
@@ -256,9 +261,34 @@ const inferRequestedServiceFromPrompt = (prompt: string) => {
 };
 
 const buildExactWordTrimmedText = (value: string, maxWords: number) => {
-  const words = normalizeText(value).split(/\s+/).filter(Boolean);
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return "";
+  }
+
+  const words = normalized.split(/\s+/).filter(Boolean);
   if (words.length <= maxWords) {
-    return normalizeText(value);
+    return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
+  }
+
+  const sentences =
+    normalized.match(/[^.!?]+[.!?]?/g)?.map((sentence) => normalizeText(sentence)) ?? [];
+  const selected: string[] = [];
+  let selectedWordCount = 0;
+
+  for (const sentence of sentences) {
+    const sentenceWordCount = countWords(sentence);
+    if (selectedWordCount + sentenceWordCount > maxWords) {
+      break;
+    }
+
+    selected.push(sentence);
+    selectedWordCount += sentenceWordCount;
+  }
+
+  if (selected.length) {
+    const combined = selected.join(" ");
+    return /[.!?]$/.test(combined) ? combined : `${combined}.`;
   }
 
   return `${words.slice(0, maxWords).join(" ").replace(/\.+$/, "")}.`;
@@ -278,7 +308,7 @@ const normalizeWordRangeText = (
   }
 
   if (words.length > maxWords) {
-    return `${words.slice(0, maxWords).join(" ").replace(/\.+$/, "")}.`;
+    return buildExactWordTrimmedText(normalized, maxWords);
   }
 
   return normalized.replace(/\.+$/, "") + ".";
@@ -348,26 +378,25 @@ const normalizeServiceDescription = (description: string, title: string) => {
   );
   const words = base.split(/\s+/).filter(Boolean);
 
-  if (words.length >= 20 && words.length <= 25) {
+  if (
+    words.length >= SERVICE_DESCRIPTION_WORDS.min &&
+    words.length <= SERVICE_DESCRIPTION_WORDS.max
+  ) {
     return base.replace(/\.+$/, "") + ".";
   }
 
-  if (words.length > 25) {
-    return `${words.slice(0, 25).join(" ").replace(/\.+$/, "")}.`;
+  if (words.length > SERVICE_DESCRIPTION_WORDS.max) {
+    return buildExactWordTrimmedText(base, SERVICE_DESCRIPTION_WORDS.max);
   }
 
-  const filler = normalizeText(
-    "planned around project goals, execution clarity, user needs, and delivery milestones.",
-  )
-    .split(/\s+/)
-    .filter(Boolean);
-  const expanded = [...words];
-
-  while (expanded.length < 20 && filler.length) {
-    expanded.push(filler[(expanded.length - words.length) % filler.length]);
+  let expanded = toSentence(base);
+  while (countWords(expanded) < SERVICE_DESCRIPTION_WORDS.min) {
+    expanded = `${expanded} ${toSentence(
+      "It stays focused on clear deliverables, dependable execution, and launch readiness",
+    )}`;
   }
 
-  return `${expanded.slice(0, 25).join(" ").replace(/\.+$/, "")}.`;
+  return buildExactWordTrimmedText(expanded, SERVICE_DESCRIPTION_WORDS.max);
 };
 
 const normalizeServiceRows = (services: ProposalService[]) =>
@@ -642,13 +671,13 @@ const buildAboutTextFallback = ({
     .join(" ");
 
   let combined = base;
-  while (countWords(combined) < 50) {
+  while (countWords(combined) < ABOUT_TEXT_WORDS.min) {
     combined = `${combined} ${toSentence(
       "This keeps the engagement focused, manageable, and commercially relevant throughout the process",
     )}`;
   }
 
-  return buildExactWordTrimmedText(combined, 60);
+  return buildExactWordTrimmedText(combined, ABOUT_TEXT_WORDS.max);
 };
 
 const normalizeAboutText = ({
@@ -668,7 +697,12 @@ const normalizeAboutText = ({
     preparedFor,
   });
 
-  const normalized = normalizeWordRangeText(value, 50, 60, fallback);
+  const normalized = normalizeWordRangeText(
+    value,
+    ABOUT_TEXT_WORDS.min,
+    ABOUT_TEXT_WORDS.max,
+    fallback,
+  );
   const firstSentence =
     normalized.match(/[^.!?]+[.!?]?/)?.[0] ?? normalized;
   const firstSentenceLower = normalizeText(firstSentence).toLowerCase();
@@ -725,18 +759,13 @@ const buildPassionTextFallback = (companyProfile: CompanyProfileShape) => {
     .map((sentence) => toSentence(sentence))
     .join(" ");
 
-  while (countWords(combined) < 60) {
+  while (countWords(combined) < PASSION_TEXT_WORDS.min) {
     combined = `${combined} ${toSentence(
       "This balance between thoughtful planning and dependable execution is what helps the final output feel both polished and genuinely useful",
     )}`;
   }
 
-  const words = normalizeText(combined).split(/\s+/).filter(Boolean);
-  if (words.length > 75) {
-    return `${words.slice(0, 75).join(" ").replace(/\.+$/, "")}.`;
-  }
-
-  return combined;
+  return buildExactWordTrimmedText(combined, PASSION_TEXT_WORDS.max);
 };
 
 const composeSelectionText = (
@@ -1188,12 +1217,12 @@ export const generateProposalDraft = async (
                 aboutText: {
                   type: "string",
                   description:
-                    "Compact About Us copy for the template. It must be between 50 and 60 words. The first 2 to 3 sentences must be about the company, its team perspective, and a real differentiator from the saved profile. The closing sentence should explain how the proposed service will help the client.",
+                    `Compact About Us copy for the template. It should usually land between ${ABOUT_TEXT_WORDS.preferredMin} and ${ABOUT_TEXT_WORDS.preferredMax} words, and it may go up to ${ABOUT_TEXT_WORDS.max} words when needed to finish naturally. The first 2 to 3 sentences must be about the company, its team perspective, and a real differentiator from the saved profile. The closing sentence should explain how the proposed service will help the client.`,
                 },
                 passionText: {
                   type: "string",
                   description:
-                    "Passion block copy for the template. It must be between 60 and 75 words and should read naturally.",
+                    `Passion block copy for the template. It must be between ${PASSION_TEXT_WORDS.min} and ${PASSION_TEXT_WORDS.max} words and should read naturally.`,
                 },
                 expertiseHighlightText: { type: "string" },
                 services: {
@@ -1202,7 +1231,10 @@ export const generateProposalDraft = async (
                     type: "object",
                     properties: {
                       title: { type: "string" },
-                      description: { type: "string" },
+                      description: {
+                        type: "string",
+                        description: `Usually ${SERVICE_DESCRIPTION_WORDS.preferredMin} to ${SERVICE_DESCRIPTION_WORDS.preferredMax} words, and up to ${SERVICE_DESCRIPTION_WORDS.max} words when needed to complete the thought naturally.`,
+                      },
                       quantity: { type: "number" },
                       unitPrice: { type: "number" },
                       price: { type: "number" },
@@ -1412,7 +1444,7 @@ export const generateProposalDraft = async (
           }),
           passionText: buildExactWordTrimmedText(
             String(args.passionText ?? ""),
-            75,
+            PASSION_TEXT_WORDS.max,
           ),
         });
         const normalizedServices = normalizeDraftServices({
@@ -1442,7 +1474,10 @@ export const generateProposalDraft = async (
                 proposalSpecific: sanitizeProposalSpecificText(
                   {
                     ...parsed,
-                    passionText: buildExactWordTrimmedText(parsed.passionText, 75),
+                    passionText: buildExactWordTrimmedText(
+                      parsed.passionText,
+                      PASSION_TEXT_WORDS.max,
+                    ),
                     services: normalizedServices,
                     pricingColumns: normalizedPricingColumns,
                     paymentTerms: resolvePaymentTerms(

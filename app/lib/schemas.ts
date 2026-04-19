@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import {
+  ABOUT_TEXT_WORDS,
+  PASSION_TEXT_WORDS,
+  SERVICE_DESCRIPTION_WORDS,
+} from "@/app/lib/proposal/textConstraints";
+
 const wordCount = (value: string) =>
   value
     .trim()
@@ -81,11 +87,11 @@ export const proposalServiceSchema = z.object({
     .string()
     .trim()
     .optional()
-    .refine((value) => !value || wordCount(value) >= 20, {
-      message: "Service description must be at least 20 words.",
+    .refine((value) => !value || wordCount(value) >= SERVICE_DESCRIPTION_WORDS.min, {
+      message: `Service description must be at least ${SERVICE_DESCRIPTION_WORDS.min} words.`,
     })
-    .refine((value) => !value || wordCount(value) <= 25, {
-      message: "Service description must be at most 25 words.",
+    .refine((value) => !value || wordCount(value) <= SERVICE_DESCRIPTION_WORDS.max, {
+      message: `Service description must be at most ${SERVICE_DESCRIPTION_WORDS.max} words.`,
     }),
   quantity: z.number().optional(),
   unitPrice: z.number().optional(),
@@ -111,21 +117,21 @@ export const proposalSpecificSchema = z.object({
     .string()
     .trim()
     .min(20)
-    .refine((value) => wordCount(value) >= 50, {
-      message: "About text must be at least 50 words.",
+    .refine((value) => wordCount(value) >= ABOUT_TEXT_WORDS.min, {
+      message: `About text must be at least ${ABOUT_TEXT_WORDS.min} words.`,
     })
-    .refine((value) => wordCount(value) <= 60, {
-      message: "About text must be at most 60 words.",
+    .refine((value) => wordCount(value) <= ABOUT_TEXT_WORDS.max, {
+      message: `About text must be at most ${ABOUT_TEXT_WORDS.max} words.`,
     }),
   passionText: z
     .string()
     .trim()
     .min(20)
-    .refine((value) => wordCount(value) >= 60, {
-      message: "Passion text must be at least 60 words.",
+    .refine((value) => wordCount(value) >= PASSION_TEXT_WORDS.min, {
+      message: `Passion text must be at least ${PASSION_TEXT_WORDS.min} words.`,
     })
-    .refine((value) => wordCount(value) <= 75, {
-      message: "Passion text must be at most 75 words.",
+    .refine((value) => wordCount(value) <= PASSION_TEXT_WORDS.max, {
+      message: `Passion text must be at most ${PASSION_TEXT_WORDS.max} words.`,
     }),
   expertiseHighlightText: z.string().trim().min(20),
   services: z.array(proposalServiceSchema).min(1),
