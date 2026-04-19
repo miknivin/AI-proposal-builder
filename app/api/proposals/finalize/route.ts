@@ -15,6 +15,8 @@ import { buildConversationMessage } from "@/app/lib/proposal/conversation";
 import ProposalConversation from "@/app/models/ProposalConversation";
 import Proposal from "@/app/models/Proposal";
 
+export const runtime = "nodejs";
+
 type FinalizeRequest = {
   proposalId?: string;
   conversationId: string;
