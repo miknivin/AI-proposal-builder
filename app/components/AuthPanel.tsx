@@ -56,7 +56,6 @@ export function AuthPanel() {
         <section className="bg-surface px-6 py-8 md:px-10 md:py-12">
           <div className="mx-auto max-w-md space-y-6">
             <div className="space-y-2">
-              <p className="eyebrow">Authentication</p>
               <h2 className="text-3xl font-semibold">Welcome back</h2>
             </div>
 
